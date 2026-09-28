@@ -1,5 +1,9 @@
 @import 'tailwindcss';
 
+body {
+  @apply bg-white text-slate-900 antialiased;
+}
+
 /* Some basic styling for Markdown answers */
 .answer p { margin: 0.4rem 0; }
 .answer ul { list-style: disc; padding-left: 1.25rem; margin: 0.4rem 0; }

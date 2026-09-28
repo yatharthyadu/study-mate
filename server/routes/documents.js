@@ -3,8 +3,10 @@ import multer from 'multer';
 import { PDFParse } from 'pdf-parse';
 import { chunkPages } from '../lib/chunker.js';
 import { embedDocuments } from '../lib/gemini.js';
+import { generateStudyAids } from '../lib/studyAids.js';
 import { Document } from '../models/Document.js';
 import { Chunk } from '../models/Chunk.js';
+import { Conversation } from '../models/Conversation.js';
 
 const router = Router();
 
@@ -33,33 +35,43 @@ router.post('/', upload.single('pdf'), async (req, res) => {
     });
   }
 
-  // Step 3: create an embedding for each chunk
-  const vectors = await embedDocuments(chunks.map((c) => c.text));
+  // Step 3: create an embedding for each chunk, and study aids at the same time.
+  // generateStudyAids never throws, so a failure there doesn't fail the upload.
+  const [vectors, studyAids] = await Promise.all([
+    embedDocuments(chunks.map((c) => c.text)),
+    generateStudyAids(req.file.originalname, pages),
+  ]);
 
   // Step 4: save to MongoDB
   const doc = await Document.create({
+    userId: req.userId,
     name: req.file.originalname,
     pages: total,
     chunkCount: chunks.length,
+    ...studyAids,
   });
   await Chunk.insertMany(
-    chunks.map((c, i) => ({ documentId: doc._id, text: c.text, page: c.page, embedding: vectors[i] }))
+    chunks.map((c, i) => ({ userId: req.userId, documentId: doc._id, text: c.text, page: c.page, embedding: vectors[i] }))
   );
 
   console.log(`Processed "${doc.name}": ${total} pages, ${chunks.length} chunks`);
   res.status(201).json(doc);
 });
 
-// GET /api/documents  -> list all uploaded PDFs
+// GET /api/documents  -> list this user's PDFs
 router.get('/', async (req, res) => {
-  const docs = await Document.find().sort({ createdAt: -1 });
+  const docs = await Document.find({ userId: req.userId }).sort({ createdAt: -1 });
   res.json(docs);
 });
 
 // DELETE /api/documents/:id  -> delete a PDF and its chunks
+// Only the owner can delete: the userId filter makes other users' PDFs look "not found"
 router.delete('/:id', async (req, res) => {
-  await Chunk.deleteMany({ documentId: req.params.id });
-  await Document.findByIdAndDelete(req.params.id);
+  const doc = await Document.findOneAndDelete({ _id: req.params.id, userId: req.userId });
+  if (!doc) return res.status(404).json({ error: 'PDF not found' });
+  await Chunk.deleteMany({ documentId: doc._id, userId: req.userId });
+  // Remove it from any chats that used it (the chats themselves are kept)
+  await Conversation.updateMany({ userId: req.userId }, { $pull: { documentIds: doc._id } });
   res.json({ ok: true });
 });
 

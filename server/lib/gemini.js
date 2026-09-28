@@ -1,16 +1,20 @@
 import { GoogleGenAI } from '@google/genai';
 import { config } from './config.js';
+import { withRetry } from './retry.js';
+import { ANSWER_SYSTEM_PROMPT } from './prompts.js';
 
 const ai = new GoogleGenAI({ apiKey: config.geminiApiKey });
 
 // ---------- Embeddings: text -> numbers (vector) ----------
 
 async function embed(texts, taskType) {
-  const response = await ai.models.embedContent({
-    model: config.embeddingModel,
-    contents: texts,
-    config: { taskType, outputDimensionality: config.embeddingDimensions },
-  });
+  const response = await withRetry(() =>
+    ai.models.embedContent({
+      model: config.embeddingModel,
+      contents: texts,
+      config: { taskType, outputDimensionality: config.embeddingDimensions },
+    })
+  );
   return response.embeddings.map((e) => e.values);
 }
 
@@ -30,18 +34,34 @@ export async function embedQuery(question) {
   return vector;
 }
 
-// ---------- LLM: context + question -> answer (streaming) ----------
+// ---------- LLM: one-shot text (titles etc.) ----------
 
-const SYSTEM_PROMPT = `You are a helpful assistant that answers only based on the provided PDF context.
-Rules:
-- Use only the information given in the CONTEXT. Do not make things up.
-- If the answer is not in the context, say clearly: "This information was not found in the PDF."
-- Cite the page number wherever you use information, like (page 3).
-- Answer in the same language the user asks in.`;
+export async function generateText(prompt) {
+  const response = await withRetry(() =>
+    ai.models.generateContent({ model: config.chatModel, contents: prompt })
+  );
+  return (response.text || '').trim();
+}
+
+// ---------- LLM: structured JSON output ----------
+
+// Gemini is forced to reply with JSON matching `schema`, so we can parse it safely
+export async function generateJson(prompt, schema) {
+  const response = await withRetry(() =>
+    ai.models.generateContent({
+      model: config.chatModel,
+      contents: prompt,
+      config: { responseMimeType: 'application/json', responseSchema: schema },
+    })
+  );
+  return JSON.parse(response.text);
+}
+
+// ---------- LLM: context + question -> answer (streaming) ----------
 
 export async function* streamAnswer(question, chunks, history = []) {
   const context = chunks
-    .map((c, i) => `[Source ${i + 1} | page ${c.page}]\n${c.text}`)
+    .map((c, i) => `[Source ${i + 1} | ${c.documentName}, page ${c.page}]\n${c.text}`)
     .join('\n\n---\n\n');
 
   // Previous conversation (last 6 messages only) so follow-up questions make sense
@@ -50,14 +70,17 @@ export async function* streamAnswer(question, chunks, history = []) {
     parts: [{ text: m.content }],
   }));
 
-  const stream = await ai.models.generateContentStream({
-    model: config.chatModel,
-    contents: [
-      ...past,
-      { role: 'user', parts: [{ text: `CONTEXT:\n${context}\n\nQUESTION: ${question}` }] },
-    ],
-    config: { systemInstruction: SYSTEM_PROMPT },
-  });
+  // Only starting the stream is retried; once text is flowing we can't restart it
+  const stream = await withRetry(() =>
+    ai.models.generateContentStream({
+      model: config.chatModel,
+      contents: [
+        ...past,
+        { role: 'user', parts: [{ text: `CONTEXT:\n${context}\n\nQUESTION: ${question}` }] },
+      ],
+      config: { systemInstruction: ANSWER_SYSTEM_PROMPT },
+    })
+  );
 
   for await (const part of stream) {
     if (part.text) yield part.text;
