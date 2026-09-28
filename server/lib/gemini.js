@@ -1,16 +1,19 @@
 import { GoogleGenAI } from '@google/genai';
 import { config } from './config.js';
+import { withRetry } from './retry.js';
 
 const ai = new GoogleGenAI({ apiKey: config.geminiApiKey });
 
 // ---------- Embeddings: text -> numbers (vector) ----------
 
 async function embed(texts, taskType) {
-  const response = await ai.models.embedContent({
-    model: config.embeddingModel,
-    contents: texts,
-    config: { taskType, outputDimensionality: config.embeddingDimensions },
-  });
+  const response = await withRetry(() =>
+    ai.models.embedContent({
+      model: config.embeddingModel,
+      contents: texts,
+      config: { taskType, outputDimensionality: config.embeddingDimensions },
+    })
+  );
   return response.embeddings.map((e) => e.values);
 }
 
@@ -50,14 +53,17 @@ export async function* streamAnswer(question, chunks, history = []) {
     parts: [{ text: m.content }],
   }));
 
-  const stream = await ai.models.generateContentStream({
-    model: config.chatModel,
-    contents: [
-      ...past,
-      { role: 'user', parts: [{ text: `CONTEXT:\n${context}\n\nQUESTION: ${question}` }] },
-    ],
-    config: { systemInstruction: SYSTEM_PROMPT },
-  });
+  // Only starting the stream is retried; once text is flowing we can't restart it
+  const stream = await withRetry(() =>
+    ai.models.generateContentStream({
+      model: config.chatModel,
+      contents: [
+        ...past,
+        { role: 'user', parts: [{ text: `CONTEXT:\n${context}\n\nQUESTION: ${question}` }] },
+      ],
+      config: { systemInstruction: SYSTEM_PROMPT },
+    })
+  );
 
   for await (const part of stream) {
     if (part.text) yield part.text;
