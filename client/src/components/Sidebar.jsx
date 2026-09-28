@@ -1,7 +1,9 @@
 import { useRef, useState } from 'react';
 import { uploadPdf, deleteDocument } from '../api.js';
+import { useAuth } from '../auth/AuthContext.jsx';
 
 export default function Sidebar({ documents, selectedId, onSelect, onChange }) {
+  const { user, logout } = useAuth();
   const inputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
@@ -84,6 +86,13 @@ export default function Sidebar({ documents, selectedId, onSelect, onChange }) {
           </li>
         ))}
       </ul>
+
+      <div className="flex items-center justify-between gap-2 border-t border-slate-200 px-4 py-3">
+        <p className="truncate text-xs text-slate-500" title={user.email}>{user.email}</p>
+        <button onClick={logout} className="shrink-0 text-xs font-medium text-slate-600 hover:text-red-600">
+          Log out
+        </button>
+      </div>
     </aside>
   );
 }

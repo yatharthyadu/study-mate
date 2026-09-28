@@ -38,28 +38,31 @@ router.post('/', upload.single('pdf'), async (req, res) => {
 
   // Step 4: save to MongoDB
   const doc = await Document.create({
+    userId: req.userId,
     name: req.file.originalname,
     pages: total,
     chunkCount: chunks.length,
   });
   await Chunk.insertMany(
-    chunks.map((c, i) => ({ documentId: doc._id, text: c.text, page: c.page, embedding: vectors[i] }))
+    chunks.map((c, i) => ({ userId: req.userId, documentId: doc._id, text: c.text, page: c.page, embedding: vectors[i] }))
   );
 
   console.log(`Processed "${doc.name}": ${total} pages, ${chunks.length} chunks`);
   res.status(201).json(doc);
 });
 
-// GET /api/documents  -> list all uploaded PDFs
+// GET /api/documents  -> list this user's PDFs
 router.get('/', async (req, res) => {
-  const docs = await Document.find().sort({ createdAt: -1 });
+  const docs = await Document.find({ userId: req.userId }).sort({ createdAt: -1 });
   res.json(docs);
 });
 
 // DELETE /api/documents/:id  -> delete a PDF and its chunks
+// Only the owner can delete: the userId filter makes other users' PDFs look "not found"
 router.delete('/:id', async (req, res) => {
-  await Chunk.deleteMany({ documentId: req.params.id });
-  await Document.findByIdAndDelete(req.params.id);
+  const doc = await Document.findOneAndDelete({ _id: req.params.id, userId: req.userId });
+  if (!doc) return res.status(404).json({ error: 'PDF not found' });
+  await Chunk.deleteMany({ documentId: doc._id, userId: req.userId });
   res.json({ ok: true });
 });
 

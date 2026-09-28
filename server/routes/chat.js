@@ -12,12 +12,12 @@ router.post('/', async (req, res) => {
   if (!documentId || !question?.trim()) {
     return res.status(400).json({ error: 'Both documentId and question are required' });
   }
-  if (!(await Document.exists({ _id: documentId }))) {
+  if (!(await Document.exists({ _id: documentId, userId: req.userId }))) {
     return res.status(404).json({ error: 'PDF not found' });
   }
 
   // Step 1 (Retrieval): find relevant chunks
-  const chunks = await findRelevantChunks(documentId, question);
+  const chunks = await findRelevantChunks(req.userId, documentId, question);
 
   // Send sources in a header so the UI can show where the answer came from
   const sources = chunks.map((c) => ({ page: c.page, score: Number(c.score.toFixed(3)), preview: c.text.slice(0, 160) }));

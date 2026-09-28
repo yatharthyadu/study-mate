@@ -3,8 +3,9 @@ import { Chunk } from '../models/Chunk.js';
 import { config } from './config.js';
 import { embedQuery } from './gemini.js';
 
-// Find the top-k chunks most similar to the question (Atlas Vector Search)
-export async function findRelevantChunks(documentId, question, k = 5) {
+// Find the top-k chunks most similar to the question (Atlas Vector Search).
+// Filtering by userId guarantees a user can never retrieve another user's text.
+export async function findRelevantChunks(userId, documentId, question, k = 5) {
   const queryVector = await embedQuery(question);
 
   return Chunk.aggregate([
@@ -15,7 +16,10 @@ export async function findRelevantChunks(documentId, question, k = 5) {
         queryVector,
         numCandidates: k * 20, // consider this many candidates, then pick the best k
         limit: k,
-        filter: { documentId: new mongoose.Types.ObjectId(documentId) },
+        filter: {
+          userId: new mongoose.Types.ObjectId(userId),
+          documentId: new mongoose.Types.ObjectId(documentId),
+        },
       },
     },
     {
