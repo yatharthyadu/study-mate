@@ -5,6 +5,7 @@ import { chunkPages } from '../lib/chunker.js';
 import { embedDocuments } from '../lib/gemini.js';
 import { Document } from '../models/Document.js';
 import { Chunk } from '../models/Chunk.js';
+import { Conversation } from '../models/Conversation.js';
 
 const router = Router();
 
@@ -63,6 +64,8 @@ router.delete('/:id', async (req, res) => {
   const doc = await Document.findOneAndDelete({ _id: req.params.id, userId: req.userId });
   if (!doc) return res.status(404).json({ error: 'PDF not found' });
   await Chunk.deleteMany({ documentId: doc._id, userId: req.userId });
+  // Remove it from any chats that used it (the chats themselves are kept)
+  await Conversation.updateMany({ userId: req.userId }, { $pull: { documentIds: doc._id } });
   res.json({ ok: true });
 });
 

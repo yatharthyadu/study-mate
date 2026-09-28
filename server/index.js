@@ -6,6 +6,7 @@ import { requireAuth } from './middleware/auth.js';
 import authRouter from './routes/auth.js';
 import documentsRouter from './routes/documents.js';
 import chatRouter from './routes/chat.js';
+import conversationsRouter from './routes/conversations.js';
 
 checkConfig();
 
@@ -21,6 +22,7 @@ app.use('/api/auth', authRouter);
 // Everything below requires a logged-in user
 app.use('/api', requireAuth);
 app.use('/api/documents', documentsRouter);
+app.use('/api/conversations', conversationsRouter);
 app.use('/api/chat', chatRouter);
 
 // All errors end up here (Express 5 also catches async errors)

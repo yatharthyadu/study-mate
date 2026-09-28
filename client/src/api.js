@@ -43,14 +43,24 @@ export function uploadPdf(file) {
 
 export const deleteDocument = (id) => request(`/api/documents/${id}`, { method: 'DELETE' }, 'Delete failed');
 
+// ---------- Conversations ----------
+
+export const listConversations = () => request('/api/conversations', {}, 'Failed to load chats');
+export const createConversation = (documentIds) =>
+  postJson('/api/conversations', { documentIds }, 'Failed to start a chat');
+export const getConversation = (id) => request(`/api/conversations/${id}`, {}, 'Failed to load chat');
+export const deleteConversation = (id) =>
+  request(`/api/conversations/${id}`, { method: 'DELETE' }, 'Failed to delete chat');
+
 // ---------- Chat ----------
 
-// The answer is streamed: each new piece is passed to onToken
-export async function askQuestion({ documentId, question, history, onSources, onToken }) {
+// The answer is streamed: each new piece is passed to onToken.
+// History comes from the database, so only the new question is sent.
+export async function askQuestion({ conversationId, question, onSources, onToken }) {
   const res = await fetch('/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ documentId, question, history }),
+    body: JSON.stringify({ conversationId, question }),
   });
 
   if (!res.ok) {

@@ -1,6 +1,7 @@
 import { GoogleGenAI } from '@google/genai';
 import { config } from './config.js';
 import { withRetry } from './retry.js';
+import { ANSWER_SYSTEM_PROMPT } from './prompts.js';
 
 const ai = new GoogleGenAI({ apiKey: config.geminiApiKey });
 
@@ -33,14 +34,16 @@ export async function embedQuery(question) {
   return vector;
 }
 
-// ---------- LLM: context + question -> answer (streaming) ----------
+// ---------- LLM: one-shot text (titles etc.) ----------
 
-const SYSTEM_PROMPT = `You are a helpful assistant that answers only based on the provided PDF context.
-Rules:
-- Use only the information given in the CONTEXT. Do not make things up.
-- If the answer is not in the context, say clearly: "This information was not found in the PDF."
-- Cite the page number wherever you use information, like (page 3).
-- Answer in the same language the user asks in.`;
+export async function generateText(prompt) {
+  const response = await withRetry(() =>
+    ai.models.generateContent({ model: config.chatModel, contents: prompt })
+  );
+  return (response.text || '').trim();
+}
+
+// ---------- LLM: context + question -> answer (streaming) ----------
 
 export async function* streamAnswer(question, chunks, history = []) {
   const context = chunks
@@ -61,7 +64,7 @@ export async function* streamAnswer(question, chunks, history = []) {
         ...past,
         { role: 'user', parts: [{ text: `CONTEXT:\n${context}\n\nQUESTION: ${question}` }] },
       ],
-      config: { systemInstruction: SYSTEM_PROMPT },
+      config: { systemInstruction: ANSWER_SYSTEM_PROMPT },
     })
   );
 
