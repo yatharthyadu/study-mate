@@ -4,9 +4,13 @@ import { streamAnswer } from '../lib/gemini.js';
 import { generateTitle } from '../lib/studyAids.js';
 import { Conversation, DEFAULT_TITLE } from '../models/Conversation.js';
 import { Message } from '../models/Message.js';
+import { Document } from '../models/Document.js';
 
 const router = Router();
 const HISTORY_SIZE = 6;
+
+// More PDFs -> retrieve a few more chunks so each one has a chance to contribute
+const chunkCount = (docCount) => (docCount > 1 ? 8 : 5);
 
 // POST /api/chat  body: { conversationId, question }
 // The answer is sent as a text stream (word by word) and saved once it's complete
@@ -20,6 +24,11 @@ router.post('/', async (req, res) => {
   const conversation = await Conversation.findOne({ _id: conversationId, userId: req.userId });
   if (!conversation) return res.status(404).json({ error: 'Chat not found' });
 
+  // File names are needed for the context and the citations
+  const documents = await Document.find({ _id: { $in: conversation.documentIds }, userId: req.userId }).select('name');
+  if (!documents.length) return res.status(400).json({ error: 'All PDFs in this chat were deleted' });
+  const nameById = new Map(documents.map((d) => [String(d._id), d.name]));
+
   // Previous messages (oldest first) so follow-up questions make sense
   const history = (
     await Message.find({ conversationId }).sort({ createdAt: -1 }).limit(HISTORY_SIZE).select('role content')
@@ -28,9 +37,18 @@ router.post('/', async (req, res) => {
   // First question: create a title in parallel with the answer
   const titlePromise = history.length === 0 && conversation.title === DEFAULT_TITLE ? generateTitle(question) : null;
 
-  // Step 1 (Retrieval): find relevant chunks
-  const chunks = await findRelevantChunks(req.userId, conversation.documentIds[0], question);
-  const sources = chunks.map((c) => ({ page: c.page, score: Number(c.score.toFixed(3)), preview: c.text.slice(0, 160) }));
+  // Step 1 (Retrieval): find relevant chunks across all of the chat's PDFs
+  const documentIds = [...nameById.keys()];
+  const chunks = (await findRelevantChunks(req.userId, documentIds, question, chunkCount(documentIds.length))).map(
+    (c) => ({ ...c, documentName: nameById.get(String(c.documentId)) })
+  );
+  const sources = chunks.map((c) => ({
+    documentId: c.documentId,
+    documentName: c.documentName,
+    page: c.page,
+    score: Number(c.score.toFixed(3)),
+    preview: c.text.slice(0, 160),
+  }));
 
   // Save the question now so it's stored even if the answer fails
   await Message.create({ conversationId, userId: req.userId, role: 'user', content: question });

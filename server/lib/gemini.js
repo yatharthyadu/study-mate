@@ -47,7 +47,7 @@ export async function generateText(prompt) {
 
 export async function* streamAnswer(question, chunks, history = []) {
   const context = chunks
-    .map((c, i) => `[Source ${i + 1} | page ${c.page}]\n${c.text}`)
+    .map((c, i) => `[Source ${i + 1} | ${c.documentName}, page ${c.page}]\n${c.text}`)
     .join('\n\n---\n\n');
 
   // Previous conversation (last 6 messages only) so follow-up questions make sense

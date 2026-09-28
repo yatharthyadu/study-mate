@@ -1,8 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import Markdown from 'react-markdown';
 import { askQuestion, createConversation, getConversation } from '../api.js';
+import DocumentPicker from './DocumentPicker.jsx';
 
-export default function ChatWindow({ conversationId, newChatDocumentIds, documents, onConversationCreated, onAnswered }) {
+export default function ChatWindow({
+  conversationId,
+  newChatDocumentIds,
+  onNewChatDocumentIdsChange,
+  documents,
+  onConversationCreated,
+  onAnswered,
+}) {
   const [messages, setMessages] = useState([]);
   const [conversationDocIds, setConversationDocIds] = useState([]);
   const [input, setInput] = useState('');
@@ -88,26 +96,34 @@ export default function ChatWindow({ conversationId, newChatDocumentIds, documen
     }
   }
 
-  if (!conversationId && chatDocIds.length === 0) {
-    return (
-      <div className="flex flex-1 items-center justify-center p-8 text-center text-slate-400">
-        Upload or select a PDF on the left, then ask questions about it.
-      </div>
-    );
-  }
+  const isNewChat = !conversationId;
 
   return (
     <section className="flex min-h-0 flex-1 flex-col">
       <header className="border-b border-slate-200 px-4 py-3">
-        <p className="truncate text-sm font-medium text-slate-900">
-          {chatDocs.map((d) => d.name).join(', ') || 'PDF deleted'}
-        </p>
+        {isNewChat ? (
+          <DocumentPicker documents={documents} selectedIds={newChatDocumentIds} onChange={onNewChatDocumentIdsChange} />
+        ) : (
+          // An existing chat's PDFs are fixed; show them as chips
+          <ul className="flex flex-wrap gap-2">
+            {chatDocs.length === 0 && <li className="text-sm text-slate-400">The PDFs in this chat were deleted</li>}
+            {chatDocs.map((d) => (
+              <li key={d._id} className="max-w-[16rem] truncate rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+                {d.name}
+              </li>
+            ))}
+          </ul>
+        )}
       </header>
 
       <div className="flex-1 space-y-4 overflow-y-auto p-4">
         {loadError && <p className="text-sm text-red-600">{loadError}</p>}
         {messages.length === 0 && !loadError && (
-          <p className="text-sm text-slate-400">Example: "Summarize this document" or "What is the refund policy?"</p>
+          <p className="text-sm text-slate-400">
+            {chatDocIds.length === 0
+              ? 'Select one or more PDFs above, then ask a question.'
+              : 'Example: "Summarize this document" or "Compare the main ideas across these PDFs"'}
+          </p>
         )}
 
         {messages.map((m, i) => (
@@ -131,7 +147,10 @@ export default function ChatWindow({ conversationId, newChatDocumentIds, documen
                   <ul className="mt-1 space-y-1">
                     {m.sources.map((s, j) => (
                       <li key={j} className="rounded bg-white p-2">
-                        <span className="font-medium">Page {s.page}</span> · score {s.score}
+                        <span className="font-medium">
+                          {s.documentName ? `${s.documentName}, ` : ''}page {s.page}
+                        </span>{' '}
+                        · score {s.score}
                         <p className="mt-1 text-slate-400">{s.preview}…</p>
                       </li>
                     ))}
@@ -148,11 +167,11 @@ export default function ChatWindow({ conversationId, newChatDocumentIds, documen
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Ask anything about the PDF…"
+          placeholder="Ask anything about your PDFs…"
           className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
         />
         <button
-          disabled={loading || !input.trim() || (conversationId && chatDocIds.length === 0)}
+          disabled={loading || !input.trim() || chatDocIds.length === 0}
           className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
         >
           Send

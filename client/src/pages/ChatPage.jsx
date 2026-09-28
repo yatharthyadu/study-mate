@@ -4,13 +4,13 @@ import ChatWindow from '../components/ChatWindow.jsx';
 import { listDocuments, listConversations } from '../api.js';
 
 // The main app screen (only reachable when logged in).
-// activeConversationId === null means "new chat": the user picks a PDF, and the
+// activeConversationId === null means "new chat": the user picks PDFs, and the
 // conversation is created on the server when the first question is sent.
 export default function ChatPage() {
   const [documents, setDocuments] = useState([]);
   const [conversations, setConversations] = useState([]);
   const [activeConversationId, setActiveConversationId] = useState(null);
-  const [selectedDocId, setSelectedDocId] = useState(null);
+  const [selectedDocIds, setSelectedDocIds] = useState([]);
   const [error, setError] = useState('');
 
   async function refreshDocuments() {
@@ -35,9 +35,9 @@ export default function ChatPage() {
     refreshConversations();
   }, []);
 
-  // Picking a PDF starts a fresh chat about it
+  // Clicking a PDF in the sidebar starts a fresh chat about just that PDF
   function selectDocument(id) {
-    setSelectedDocId(id);
+    setSelectedDocIds(id ? [id] : []);
     setActiveConversationId(null);
   }
 
@@ -46,13 +46,18 @@ export default function ChatPage() {
     await Promise.all([refreshDocuments(), refreshConversations()]);
   }
 
+  // Keep the new-chat selection in sync when a PDF is deleted
+  useEffect(() => {
+    setSelectedDocIds((ids) => ids.filter((id) => documents.some((d) => d._id === id)));
+  }, [documents]);
+
   return (
     <div className="flex h-screen flex-col bg-white md:flex-row">
       <Sidebar
         documents={documents}
         conversations={conversations}
         activeConversationId={activeConversationId}
-        selectedDocId={selectedDocId}
+        selectedDocIds={selectedDocIds}
         onSelectDocument={selectDocument}
         onOpenConversation={setActiveConversationId}
         onNewChat={() => setActiveConversationId(null)}
@@ -63,7 +68,8 @@ export default function ChatPage() {
         {error && <div className="bg-red-50 px-4 py-2 text-sm text-red-700">{error}</div>}
         <ChatWindow
           conversationId={activeConversationId}
-          newChatDocumentIds={selectedDocId ? [selectedDocId] : []}
+          newChatDocumentIds={selectedDocIds}
+          onNewChatDocumentIdsChange={setSelectedDocIds}
           documents={documents}
           onConversationCreated={setActiveConversationId}
           onAnswered={refreshConversations}

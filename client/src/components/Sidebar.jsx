@@ -7,7 +7,7 @@ export default function Sidebar({
   documents,
   conversations,
   activeConversationId,
-  selectedDocId,
+  selectedDocIds,
   onSelectDocument,
   onOpenConversation,
   onNewChat,
@@ -39,7 +39,6 @@ export default function Sidebar({
     e.stopPropagation();
     if (!confirm('Delete this PDF?')) return;
     await deleteDocument(id);
-    if (id === selectedDocId) onSelectDocument(null);
     onDocumentsChange();
   }
 
@@ -91,7 +90,7 @@ export default function Sidebar({
                 <div
                   onClick={() => onSelectDocument(doc._id)}
                   className={`group flex cursor-pointer items-center justify-between rounded-lg px-3 py-2 text-sm ${
-                    !activeConversationId && doc._id === selectedDocId
+                    !activeConversationId && selectedDocIds.includes(doc._id)
                       ? 'bg-indigo-100 text-indigo-900'
                       : 'text-slate-700 hover:bg-slate-100'
                   }`}
