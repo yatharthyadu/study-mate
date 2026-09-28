@@ -7,6 +7,9 @@ const documentSchema = new mongoose.Schema(
     name: { type: String, required: true },
     pages: Number,
     chunkCount: Number,
+    // Study aids generated after upload (empty if that Gemini call failed)
+    summary: { type: String, default: '' },
+    suggestedQuestions: { type: [String], default: [] },
   },
   { timestamps: true }
 );

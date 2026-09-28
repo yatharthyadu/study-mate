@@ -3,6 +3,7 @@ import multer from 'multer';
 import { PDFParse } from 'pdf-parse';
 import { chunkPages } from '../lib/chunker.js';
 import { embedDocuments } from '../lib/gemini.js';
+import { generateStudyAids } from '../lib/studyAids.js';
 import { Document } from '../models/Document.js';
 import { Chunk } from '../models/Chunk.js';
 import { Conversation } from '../models/Conversation.js';
@@ -34,8 +35,12 @@ router.post('/', upload.single('pdf'), async (req, res) => {
     });
   }
 
-  // Step 3: create an embedding for each chunk
-  const vectors = await embedDocuments(chunks.map((c) => c.text));
+  // Step 3: create an embedding for each chunk, and study aids at the same time.
+  // generateStudyAids never throws, so a failure there doesn't fail the upload.
+  const [vectors, studyAids] = await Promise.all([
+    embedDocuments(chunks.map((c) => c.text)),
+    generateStudyAids(req.file.originalname, pages),
+  ]);
 
   // Step 4: save to MongoDB
   const doc = await Document.create({
@@ -43,6 +48,7 @@ router.post('/', upload.single('pdf'), async (req, res) => {
     name: req.file.originalname,
     pages: total,
     chunkCount: chunks.length,
+    ...studyAids,
   });
   await Chunk.insertMany(
     chunks.map((c, i) => ({ userId: req.userId, documentId: doc._id, text: c.text, page: c.page, embedding: vectors[i] }))

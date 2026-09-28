@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import Markdown from 'react-markdown';
 import { askQuestion, createConversation, getConversation } from '../api.js';
 import DocumentPicker from './DocumentPicker.jsx';
+import SuggestedQuestions from './SuggestedQuestions.jsx';
 
 export default function ChatWindow({
   conversationId,
@@ -52,10 +53,14 @@ export default function ChatWindow({
   const chatDocIds = conversationId ? conversationDocIds : newChatDocumentIds;
   const chatDocs = documents.filter((d) => chatDocIds.includes(d._id));
 
-  async function handleSubmit(e) {
+  function handleSubmit(e) {
     e.preventDefault();
-    const question = input.trim();
-    if (!question || loading) return;
+    send(input.trim());
+  }
+
+  // Used by both the input box and the suggested-question chips
+  async function send(question) {
+    if (!question || loading || chatDocIds.length === 0) return;
 
     setMessages((prev) => [
       ...prev,
@@ -119,11 +124,14 @@ export default function ChatWindow({
       <div className="flex-1 space-y-4 overflow-y-auto p-4">
         {loadError && <p className="text-sm text-red-600">{loadError}</p>}
         {messages.length === 0 && !loadError && (
-          <p className="text-sm text-slate-400">
-            {chatDocIds.length === 0
-              ? 'Select one or more PDFs above, then ask a question.'
-              : 'Example: "Summarize this document" or "Compare the main ideas across these PDFs"'}
-          </p>
+          <>
+            <p className="text-sm text-slate-400">
+              {chatDocIds.length === 0
+                ? 'Select one or more PDFs above, then ask a question.'
+                : 'Ask your own question, or try one of these:'}
+            </p>
+            <SuggestedQuestions documents={chatDocs} onAsk={send} disabled={loading} />
+          </>
         )}
 
         {messages.map((m, i) => (

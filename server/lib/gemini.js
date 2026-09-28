@@ -43,6 +43,20 @@ export async function generateText(prompt) {
   return (response.text || '').trim();
 }
 
+// ---------- LLM: structured JSON output ----------
+
+// Gemini is forced to reply with JSON matching `schema`, so we can parse it safely
+export async function generateJson(prompt, schema) {
+  const response = await withRetry(() =>
+    ai.models.generateContent({
+      model: config.chatModel,
+      contents: prompt,
+      config: { responseMimeType: 'application/json', responseSchema: schema },
+    })
+  );
+  return JSON.parse(response.text);
+}
+
 // ---------- LLM: context + question -> answer (streaming) ----------
 
 export async function* streamAnswer(question, chunks, history = []) {
