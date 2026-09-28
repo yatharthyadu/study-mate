@@ -13,7 +13,7 @@ export default function Signup() {
 
   return (
     <AuthForm
-      title="Create your account"
+      title="Create your StudyMate account"
       subtitle="Password must be at least 8 characters"
       submitLabel="Sign up"
       onSubmit={handleSignup}

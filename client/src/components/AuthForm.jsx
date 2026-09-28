@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import Brand from './Brand.jsx';
 
 // Shared email + password form used by the Login and Signup pages
 export default function AuthForm({ title, subtitle, submitLabel, onSubmit, footer }) {
@@ -21,8 +22,16 @@ export default function AuthForm({ title, subtitle, submitLabel, onSubmit, foote
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
-      <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-4 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+    <div className="flex min-h-dvh flex-col items-center justify-center gap-6 bg-gradient-to-br from-indigo-50 via-white to-violet-50 px-4 py-10">
+      <div className="text-center">
+        <div className="inline-block">
+          <Brand />
+        </div>
+        <p className="mt-3 max-w-sm text-sm text-slate-500">
+          Upload your notes and textbooks, then ask questions. Every answer is grounded in your material and cited by page.
+        </p>
+      </div>
+      <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-4 rounded-2xl bg-white p-6 shadow-lg shadow-indigo-100 ring-1 ring-slate-200">
         <div>
           <h1 className="text-xl font-semibold text-slate-900">{title}</h1>
           <p className="text-sm text-slate-500">{subtitle}</p>

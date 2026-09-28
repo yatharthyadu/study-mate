@@ -1,3 +1,5 @@
+import { HOVER_REVEAL } from './styles.js';
+
 // Past chats in the sidebar. Clicking one opens it; ✕ deletes it.
 export default function ConversationList({ conversations, activeId, onOpen, onDelete }) {
   if (conversations.length === 0) {
@@ -11,16 +13,16 @@ export default function ConversationList({ conversations, activeId, onOpen, onDe
           <div
             onClick={() => onOpen(c._id)}
             className={`group flex cursor-pointer items-center justify-between rounded-lg px-3 py-2 text-sm ${
-              c._id === activeId ? 'bg-indigo-100 text-indigo-900' : 'text-slate-700 hover:bg-slate-100'
+              c._id === activeId ? 'bg-indigo-50 text-indigo-900' : 'text-slate-700 hover:bg-slate-100'
             }`}
           >
-            <p className="min-w-0 truncate">{c.title}</p>
+            <p className="min-w-0 truncate">💬 {c.title}</p>
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 onDelete(c._id);
               }}
-              className="ml-2 text-slate-400 opacity-0 hover:text-red-600 group-hover:opacity-100"
+              className={`ml-2 text-slate-400 hover:text-red-600 ${HOVER_REVEAL}`}
               title="Delete chat"
             >
               ✕

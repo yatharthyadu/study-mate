@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import Markdown from 'react-markdown';
 import { askQuestion, createConversation, getConversation } from '../api.js';
 import DocumentPicker from './DocumentPicker.jsx';
 import SuggestedQuestions from './SuggestedQuestions.jsx';
+import MessageBubble from './MessageBubble.jsx';
 
 export default function ChatWindow({
   conversationId,
@@ -27,12 +27,14 @@ export default function ChatWindow({
   useEffect(() => {
     visibleIdRef.current = conversationId;
     setLoadError('');
+    if (conversationId && conversationId === createdIdRef.current) return;
+    createdIdRef.current = null; // Reopening it later should load it from the server
+
     if (!conversationId) {
       setMessages([]);
       setConversationDocIds([]);
       return;
     }
-    if (conversationId === createdIdRef.current) return;
 
     let cancelled = false;
     setMessages([]);
@@ -50,7 +52,8 @@ export default function ChatWindow({
 
   useEffect(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), [messages]);
 
-  const chatDocIds = conversationId ? conversationDocIds : newChatDocumentIds;
+  const isNewChat = !conversationId;
+  const chatDocIds = isNewChat ? newChatDocumentIds : conversationDocIds;
   const chatDocs = documents.filter((d) => chatDocIds.includes(d._id));
 
   function handleSubmit(e) {
@@ -101,89 +104,70 @@ export default function ChatWindow({
     }
   }
 
-  const isNewChat = !conversationId;
-
   return (
     <section className="flex min-h-0 flex-1 flex-col">
-      <header className="border-b border-slate-200 px-4 py-3">
-        {isNewChat ? (
-          <DocumentPicker documents={documents} selectedIds={newChatDocumentIds} onChange={onNewChatDocumentIdsChange} />
-        ) : (
-          // An existing chat's PDFs are fixed; show them as chips
-          <ul className="flex flex-wrap gap-2">
-            {chatDocs.length === 0 && <li className="text-sm text-slate-400">The PDFs in this chat were deleted</li>}
-            {chatDocs.map((d) => (
-              <li key={d._id} className="max-w-[16rem] truncate rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-                {d.name}
-              </li>
-            ))}
-          </ul>
-        )}
+      <header className="border-b border-slate-200 bg-white px-4 py-3">
+        <div className="mx-auto max-w-3xl">
+          {isNewChat ? (
+            <DocumentPicker documents={documents} selectedIds={newChatDocumentIds} onChange={onNewChatDocumentIdsChange} />
+          ) : (
+            // An existing chat's PDFs are fixed; show them as chips
+            <ul className="flex flex-wrap gap-2">
+              {chatDocs.length === 0 && <li className="text-sm text-slate-400">The PDFs in this chat were deleted</li>}
+              {chatDocs.map((d) => (
+                <li key={d._id} className="max-w-[16rem] truncate rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+                  📄 {d.name}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </header>
 
-      <div className="flex-1 space-y-4 overflow-y-auto p-4">
-        {loadError && <p className="text-sm text-red-600">{loadError}</p>}
-        {messages.length === 0 && !loadError && (
-          <>
-            <p className="text-sm text-slate-400">
-              {chatDocIds.length === 0
-                ? 'Select one or more PDFs above, then ask a question.'
-                : 'Ask your own question, or try one of these:'}
-            </p>
-            <SuggestedQuestions documents={chatDocs} onAsk={send} disabled={loading} />
-          </>
-        )}
+      <div className="flex-1 overflow-y-auto bg-slate-50/60">
+        <div className="mx-auto max-w-3xl space-y-4 px-4 py-6">
+          {loadError && <p className="text-sm text-red-600">{loadError}</p>}
 
-        {messages.map((m, i) => (
-          <div key={m._id || i} className={m.role === 'user' ? 'flex justify-end' : ''}>
-            <div
-              className={`max-w-[85%] rounded-2xl px-4 py-2 text-sm ${
-                m.role === 'user' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-900'
-              }`}
-            >
-              {m.role === 'assistant' ? (
-                <div className="answer">
-                  {m.content ? <Markdown>{m.content}</Markdown> : <span className="text-slate-400">Thinking…</span>}
-                </div>
-              ) : (
-                m.content
-              )}
-
-              {m.sources?.length > 0 && (
-                <details className="mt-2 text-xs text-slate-500">
-                  <summary className="cursor-pointer">Sources ({m.sources.length} chunks)</summary>
-                  <ul className="mt-1 space-y-1">
-                    {m.sources.map((s, j) => (
-                      <li key={j} className="rounded bg-white p-2">
-                        <span className="font-medium">
-                          {s.documentName ? `${s.documentName}, ` : ''}page {s.page}
-                        </span>{' '}
-                        · score {s.score}
-                        <p className="mt-1 text-slate-400">{s.preview}…</p>
-                      </li>
-                    ))}
-                  </ul>
-                </details>
-              )}
+          {messages.length === 0 && !loadError && (
+            <div className="space-y-4">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">
+                  {chatDocIds.length === 0 ? 'What are we studying today?' : 'Ready when you are'}
+                </h2>
+                <p className="text-sm text-slate-500">
+                  {chatDocIds.length === 0
+                    ? documents.length === 0
+                      ? 'Upload your notes or a textbook to get started.'
+                      : 'Pick one or more PDFs above, then ask a question.'
+                    : 'Ask your own question, or start with one of these:'}
+                </p>
+              </div>
+              <SuggestedQuestions documents={chatDocs} onAsk={send} disabled={loading} />
             </div>
-          </div>
-        ))}
-        <div ref={bottomRef} />
+          )}
+
+          {messages.map((m, i) => (
+            <MessageBubble key={m._id || i} message={m} />
+          ))}
+          <div ref={bottomRef} />
+        </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="flex gap-2 border-t border-slate-200 p-4">
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Ask anything about your PDFs…"
-          className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500"
-        />
-        <button
-          disabled={loading || !input.trim() || chatDocIds.length === 0}
-          className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
-        >
-          Send
-        </button>
+      <form onSubmit={handleSubmit} className="border-t border-slate-200 bg-white px-4 py-3">
+        <div className="mx-auto flex max-w-3xl gap-2">
+          <input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder={chatDocIds.length ? 'Ask about your notes…' : 'Select a PDF first…'}
+            className="min-w-0 flex-1 rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+          />
+          <button
+            disabled={loading || !input.trim() || chatDocIds.length === 0}
+            className="shrink-0 rounded-full bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+          >
+            {loading ? '…' : 'Send'}
+          </button>
+        </div>
       </form>
     </section>
   );

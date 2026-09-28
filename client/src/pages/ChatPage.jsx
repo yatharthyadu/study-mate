@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import Sidebar from '../components/Sidebar.jsx';
+import Brand from '../components/Brand.jsx';
 import ChatWindow from '../components/ChatWindow.jsx';
 import { listDocuments, listConversations } from '../api.js';
 
@@ -12,6 +13,8 @@ export default function ChatPage() {
   const [activeConversationId, setActiveConversationId] = useState(null);
   const [selectedDocIds, setSelectedDocIds] = useState([]);
   const [error, setError] = useState('');
+  // Mobile only: is the sidebar drawer open?
+  const [menuOpen, setMenuOpen] = useState(false);
 
   async function refreshDocuments() {
     try {
@@ -39,6 +42,17 @@ export default function ChatPage() {
   function selectDocument(id) {
     setSelectedDocIds(id ? [id] : []);
     setActiveConversationId(null);
+    setMenuOpen(false);
+  }
+
+  function openConversation(id) {
+    setActiveConversationId(id);
+    setMenuOpen(false);
+  }
+
+  function startNewChat() {
+    setActiveConversationId(null);
+    setMenuOpen(false);
   }
 
   // Deleting a PDF can change which chats reference it
@@ -52,19 +66,38 @@ export default function ChatPage() {
   }, [documents]);
 
   return (
-    <div className="flex h-screen flex-col bg-white md:flex-row">
-      <Sidebar
-        documents={documents}
-        conversations={conversations}
-        activeConversationId={activeConversationId}
-        selectedDocIds={selectedDocIds}
-        onSelectDocument={selectDocument}
-        onOpenConversation={setActiveConversationId}
-        onNewChat={() => setActiveConversationId(null)}
-        onDocumentsChange={handleDocumentsChange}
-        onConversationsChange={refreshConversations}
-      />
-      <main className="flex min-h-0 flex-1 flex-col">
+    <div className="flex h-dvh bg-white">
+      {/* Mobile: dark backdrop behind the open drawer */}
+      {menuOpen && <div className="fixed inset-0 z-30 bg-slate-900/40 md:hidden" onClick={() => setMenuOpen(false)} />}
+
+      {/* Sidebar: slide-in drawer on mobile, always visible on desktop */}
+      <div
+        className={`fixed inset-y-0 left-0 z-40 transition-transform md:static md:translate-x-0 ${
+          menuOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        <Sidebar
+          documents={documents}
+          conversations={conversations}
+          activeConversationId={activeConversationId}
+          selectedDocIds={selectedDocIds}
+          onSelectDocument={selectDocument}
+          onOpenConversation={openConversation}
+          onNewChat={startNewChat}
+          onDocumentsChange={handleDocumentsChange}
+          onConversationsChange={refreshConversations}
+          onClose={() => setMenuOpen(false)}
+        />
+      </div>
+
+      <main className="flex min-w-0 flex-1 flex-col">
+        {/* Mobile top bar with the menu button */}
+        <div className="flex items-center gap-3 border-b border-slate-200 px-4 py-2 md:hidden">
+          <button onClick={() => setMenuOpen(true)} className="rounded-lg p-1.5 text-xl leading-none text-slate-600 hover:bg-slate-100" aria-label="Open menu">
+            ☰
+          </button>
+          <Brand />
+        </div>
         {error && <div className="bg-red-50 px-4 py-2 text-sm text-red-700">{error}</div>}
         <ChatWindow
           conversationId={activeConversationId}

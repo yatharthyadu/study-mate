@@ -16,7 +16,7 @@ export default function Login() {
   return (
     <AuthForm
       title="Welcome back"
-      subtitle="Log in to chat with your PDFs"
+      subtitle="Log in to keep studying"
       submitLabel="Log in"
       onSubmit={handleLogin}
       footer={{ text: "Don't have an account?", linkLabel: 'Sign up', to: '/signup' }}
